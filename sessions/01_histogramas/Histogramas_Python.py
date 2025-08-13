@@ -1,7 +1,7 @@
-# --- src/histograms.py
-# CLI to plot histograms from a CSV.
-# - Headless by default for Docker: saves PNGs to output/
-# - Use --column to select one column, otherwise plots all numeric columns.
+# sessions/01_histogramas/main.py
+# Session 1: Histograms from a CSV
+# - Headless by default (saves PNGs into output/)
+# - Use --column to plot a single numeric column; otherwise plots all numeric columns.
 
 from pathlib import Path
 import argparse
@@ -9,51 +9,50 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 
+from common.io import resolve_repo_path, ensure_dir
+
 def parse_args():
-    p = argparse.ArgumentParser(description="Plot histograms from a CSV.")
-    p.add_argument("--csv", required=True, help="Path to CSV (repo-relative or absolute).")
+    p = argparse.ArgumentParser(description="Session 1 - Histograms from a CSV.")
+    p.add_argument("--csv", required=True, help="CSV path (repo-relative or absolute).")
     p.add_argument("--column", help="Numeric column to plot. If omitted, plots all numeric columns.")
     p.add_argument("--bins", type=int, default=10, help="Number of bins (default: 10).")
-    p.add_argument("--outdir", default="output", help="Output directory (default: output).")
+    p.add_argument("--outdir", default="output/01_histogramas", help="Output directory.")
     p.add_argument("--show", action="store_true", help="Show windows (local dev only; not for Docker).")
     return p.parse_args()
 
 def main():
     args = parse_args()
 
-    # Headless backend unless explicitly showing
+    # Use headless backend unless explicitly showing
     if not args.show:
         matplotlib.use("Agg")
 
-    repo_root = Path(__file__).resolve().parents[1]
-    csv_path = Path(args.csv)
-    if not csv_path.is_absolute():
-        csv_path = (repo_root / csv_path).resolve()
+    # Resolve paths
+    repo_csv = Path(args.csv)
+    if not repo_csv.is_absolute():
+        repo_csv = resolve_repo_path(args.csv)
+    out_dir = resolve_repo_path(args.outdir)
+    ensure_dir(out_dir)
 
-    out_dir = Path(args.outdir)
-    if not out_dir.is_absolute():
-        out_dir = (repo_root / out_dir).resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if not repo_csv.exists():
+        raise FileNotFoundError(f"CSV not found: {repo_csv}")
 
-    if not csv_path.exists():
-        raise FileNotFoundError(f"CSV not found: {csv_path}")
-
-    print(f"Loading: {csv_path}")
-    df = pd.read_csv(csv_path)
+    print(f"Loading: {repo_csv}")
+    df = pd.read_csv(repo_csv)
     print(df.info())
 
-    # Decide columns
+    # Choose columns
     if args.column:
         if args.column not in df.columns:
             raise ValueError(f"Column '{args.column}' not found.")
-        cols = [args.column]
+        columns = [args.column]
     else:
-        cols = df.select_dtypes(include="number").columns.tolist()
-        if not cols:
+        columns = df.select_dtypes(include="number").columns.tolist()
+        if not columns:
             raise ValueError("No numeric columns to plot.")
 
     saved = []
-    for col in cols:
+    for col in columns:
         s = df[col].dropna()
         if s.empty:
             print(f"[skip] '{col}' is empty after dropna().")
