@@ -19,4 +19,4 @@ COPY common/ /app/common/
 
 # Default command: run Session 1 using a CSV under data/
 # (You can override it at runtime)
-CMD ["python", "sessions/01_histogramas/main.py", "--csv", "data/categoria_de_corredores.csv"]
+CMD ["python", "sessions/01_histogramas/Histogramas_Python.py", "--csv", "data/categoria_de_corredores.csv"]
