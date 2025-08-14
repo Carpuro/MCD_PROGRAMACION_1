@@ -38,7 +38,14 @@ def main():
         raise FileNotFoundError(f"CSV not found: {repo_csv}")
 
     print(f"Loading: {repo_csv}")
-    df = pd.read_csv(repo_csv)
+
+    # Autodetect separator (comma, tab, space, etc.)
+    df = pd.read_csv(repo_csv, sep=None, engine="python")
+
+    # Try converting any convertible columns to numeric
+    for col in df.columns:
+    df[col] = pd.to_numeric(df[col], errors="ignore")
+
     print(df.info())
 
     # Choose columns

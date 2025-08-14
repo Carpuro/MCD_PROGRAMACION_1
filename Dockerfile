@@ -15,4 +15,4 @@ ENV PYTHONPATH=/app
 
 COPY sessions/ /app/sessions/
 
-CMD ["python", "sessions/01_histogramas/Histogramas_Python.py", "--csv", "data/categoria_de_corredores.csv"]
+CMD ["python", "sessions/01_histogramas/Histogramas_Python.py", "--csv", "data/categorias_de_corredores.csv"]
