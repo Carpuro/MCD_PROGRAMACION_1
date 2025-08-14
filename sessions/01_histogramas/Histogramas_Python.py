@@ -25,7 +25,7 @@ def main():
     if not args.show:
         matplotlib.use("Agg")
 
-    # Paths
+    # Resolve Paths
     repo_csv = Path(args.csv)
     if not repo_csv.is_absolute():
         repo_csv = resolve_repo_path(args.csv)
@@ -40,13 +40,24 @@ def main():
     df = pd.read_csv(repo_csv, sep=None, engine="python") # Automatically detect separator either tab or comma
     print(df.head())
 
-    # Columns to plot
+
+    # Detect numeric columns automatically (convert if possible)
+    numeric_cols = []
+    for col in df.columns:
+        try:
+            pd.to_numeric(df[col], errors='raise')
+            numeric_cols.append(col)
+        except Exception:
+            pass
+
+    # Choose the columns to plot
     if args.column:
-        if args.column not in df.columns:
-            raise ValueError(f"Column '{args.column}' not found.")
+        if args.column not in numeric_cols:
+            raise ValueError(f"Column '{args.column}' is not numeric..")
         columns = [args.column]
     else:
-        columns = df.select_dtypes(include="number").columns.tolist()
+        # Only plot relevant numeric columns by default
+        columns = numeric_cols
         if not columns:
             raise ValueError("No numeric columns to plot.")
 
@@ -56,7 +67,7 @@ def main():
     colors = cm.tab10.colors # Color map for histograms
 
     for i, col in enumerate(columns):
-        s = df[col].dropna()
+        s = pd.to_numeric(df[col], errors="coerce").dropna()
         if s.empty:
             print(f"[skip] '{col}' is empty after dropna().")
             continue
@@ -67,18 +78,20 @@ def main():
         summary_data.append(stats)
 
         # Figure with improved UX
-        plt.figure(figsize=(9, 6)) # Create a new figure with a specific size
-        plt.hist(s, 
-                 bins=args.bins,  # Number of bins
-                 edgecolor="black", # Border color
-                 color=colors[i % len(colors)], # Histogram color
-                 alpha = 0.75, # Transparency
-                 linewidth = 1.2) # Border line width
-        plt.title(f"Histograma - {col}", fontsize=16, fontweight="bold", color="#333333")
-        plt.xlabel(col, fontsize=14)
-        plt.ylabel("Frecuencia", fontsize=14)
-        plt.grid(axis="y", linestyle="--", alpha=0.5)
-        plt.tight_layout()
+        plt.figure(figsize=(9, 6))                                                          # Create a new figure with a specific size
+        plt.hist(s,                                                                         # Histogram data
+                 bins=args.bins,                                                            # Number of bins
+                 edgecolor="black",                                                         # Border color
+                 color=colors[i % len(colors)],                                             # Histogram color
+                 alpha=0.75,                                                                # Transparency
+                 linewidth=1.2)                                                             # Border line width
+        plt.title(f"Histograma - {col}", fontsize=16, fontweight="bold", color="#333333") # Title
+        plt.xlabel(col, fontsize=14)                                                        # X-axis label
+        plt.ylabel("Frecuencia", fontsize=14)                                               # Y-axis label
+        plt.grid(axis="y", linestyle="--", alpha=0.5)                                       # Grid lines
+        plt.gca().set_facecolor("#f9f9f9")                                                # Background color
+        plt.gca().yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x):,}"))      # Y-axis formatter
+        plt.tight_layout()                                                                  # Adjust layout
 
         if args.show:
             plt.show()
@@ -87,6 +100,7 @@ def main():
             plt.savefig(out_file, bbox_inches="tight", dpi=120)
             plt.close()
             saved.append(out_file)
+        
 
     # Save summary
     if summary_data:
