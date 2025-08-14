@@ -12,25 +12,25 @@ matplotlib – for visualizations
 
 1. Clone this repository
 
-Download the project to your computer:
+    Download the project to your computer:
 
-git clone <repo_url>
-cd MCD_PROGRAMACION_1
+    git clone <repo_url>
+    cd MCD_PROGRAMACION_1
 
 2. Build the Docker image
 
-Run this once to prepare the environment:
+    Run this once to prepare the environment:
 
-docker build -t mcd_prog1:latest .
+    docker build -t mcd_prog1:latest .
 
 
 This step creates a container image called "mcd_prog1" with all the dependencies ready.
 
 3. Run a session program
 
-Each session is in:
+    Each session is in:
 
-sessions/<nn_topic>/<program>.py
+    sessions/<nn_topic>/<program>.py
 
 
 For example, to run Session 1 – Histogramas:
