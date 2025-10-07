@@ -16,7 +16,7 @@ except FileNotFoundError:
     print("⚠️ No hay imagen.")
 
 # TITULO
-plt.title("Maestría en Ciencia de los Datos \n"
+plt.title("Te amooo\n"
           "Programación 1 - Reloj Digital",
           fontsize=14, fontweight="bold", pad=20, color="black")
 
