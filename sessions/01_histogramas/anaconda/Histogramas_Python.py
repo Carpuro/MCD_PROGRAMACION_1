@@ -7,8 +7,8 @@ from matplotlib.ticker import FuncFormatter
 
 # --- Configuración ---
 CSV_PATH = Path("categorias_de_corredores.csv")     # Ruta al CSV
-OUT_DIR = Path("01_histogramas")         # Carpeta de salida
-BINS = 10                                                # Número de bins
+OUT_DIR = Path("01_histogramas")                    # Carpeta de salida
+BINS = 10                                           # Número de bins
 # ----------------------
 
 def main():
