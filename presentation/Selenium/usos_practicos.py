@@ -29,6 +29,7 @@ def caso_login():
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
     driver = webdriver.Chrome(options=chrome_options)
     wait = WebDriverWait(driver, 10)
@@ -38,20 +39,35 @@ def caso_login():
         driver.get("https://practicetestautomation.com/practice-test-login/")
         print("✓ Página de login cargada")
         
-        # Encontrar campos de usuario y contraseña
+        # Esperar a que la página cargue completamente
+        time.sleep(1)
+        
+        # Encontrar campos de usuario y contraseña - esperar que sean clickeables
         username_field = wait.until(
-            EC.presence_of_element_located((By.ID, "username"))
+            EC.element_to_be_clickable((By.ID, "username"))
         )
-        password_field = driver.find_element(By.ID, "password")
+        password_field = wait.until(
+            EC.element_to_be_clickable((By.ID, "password"))
+        )
         
         # Ingresar credenciales
+        username_field.clear()
         username_field.send_keys("student")
+        password_field.clear()
         password_field.send_keys("Password123")
         print("✓ Credenciales ingresadas")
         
-        # Hacer clic en submit
-        submit_button = driver.find_element(By.ID, "submit")
-        submit_button.click()
+        # Esperar y hacer clic en submit - usar JavaScript si falla el clic normal
+        submit_button = wait.until(
+            EC.element_to_be_clickable((By.ID, "submit"))
+        )
+        
+        try:
+            submit_button.click()
+        except:
+            # Si el clic normal falla, usar JavaScript
+            driver.execute_script("arguments[0].click();", submit_button)
+        
         print("✓ Formulario enviado")
         
         # Verificar login exitoso
@@ -65,6 +81,8 @@ def caso_login():
             
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         driver.quit()
 
@@ -149,6 +167,7 @@ def caso_formulario_complejo():
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
     driver = webdriver.Chrome(options=chrome_options)
     wait = WebDriverWait(driver, 10)
@@ -158,9 +177,11 @@ def caso_formulario_complejo():
         driver.get("https://www.selenium.dev/selenium/web/web-form.html")
         print("✓ Formulario cargado")
         
+        time.sleep(1)  # Pequeña espera para asegurar carga completa
+        
         # Datos del formulario
         datos_formulario = {
-            'texto': 'Juan Pérez',
+            'texto': 'Carlos Pulido Rosas',
             'password': 'MiPassword123!',
             'textarea': 'Este es un ejemplo de automatización de formularios con Selenium.',
             'dropdown': '2',
@@ -169,64 +190,72 @@ def caso_formulario_complejo():
         
         # Llenar campo de texto
         campo_texto = wait.until(
-            EC.presence_of_element_located((By.ID, "my-text-id"))
+            EC.element_to_be_clickable((By.ID, "my-text-id"))
         )
         campo_texto.clear()
         campo_texto.send_keys(datos_formulario['texto'])
         print(f"✓ Campo texto: {datos_formulario['texto']}")
         
         # Llenar password
-        campo_password = driver.find_element(By.NAME, "my-password")
+        campo_password = wait.until(
+            EC.element_to_be_clickable((By.NAME, "my-password"))
+        )
         campo_password.send_keys(datos_formulario['password'])
         print("✓ Campo password llenado")
         
         # Llenar textarea
-        campo_textarea = driver.find_element(By.NAME, "my-textarea")
+        campo_textarea = wait.until(
+            EC.element_to_be_clickable((By.NAME, "my-textarea"))
+        )
         campo_textarea.send_keys(datos_formulario['textarea'])
         print("✓ Textarea llenado")
         
-        # Seleccionar del dropdown
+        # Seleccionar del dropdown usando JavaScript para mayor confiabilidad
         dropdown = driver.find_element(By.NAME, "my-select")
-        dropdown.click()
-        time.sleep(0.5)
-        opcion = driver.find_element(By.CSS_SELECTOR, f"option[value='{datos_formulario['dropdown']}']")
-        opcion.click()
+        driver.execute_script("arguments[0].value = arguments[1];", dropdown, datos_formulario['dropdown'])
         print("✓ Dropdown seleccionado")
         
-        # Marcar checkboxes
+        # Marcar checkboxes usando JavaScript
         checkbox1 = driver.find_element(By.ID, "my-check-1")
         if not checkbox1.is_selected():
-            checkbox1.click()
+            driver.execute_script("arguments[0].click();", checkbox1)
+            
         checkbox2 = driver.find_element(By.ID, "my-check-2")
         if not checkbox2.is_selected():
-            checkbox2.click()
+            driver.execute_script("arguments[0].click();", checkbox2)
         print("✓ Checkboxes marcados")
         
-        # Seleccionar radio button
+        # Seleccionar radio button usando JavaScript
         radio = driver.find_element(By.ID, "my-radio-2")
-        radio.click()
+        driver.execute_script("arguments[0].click();", radio)
         print("✓ Radio button seleccionado")
         
         # Tomar screenshot del formulario llenado
         driver.save_screenshot("/mnt/user-data/outputs/formulario_llenado.png")
         print("✓ Screenshot guardado")
         
-        # Enviar formulario
-        submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-        submit_button.click()
+        # Enviar formulario usando JavaScript para evitar interceptores
+        submit_button = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "button[type='submit']"))
+        )
+        driver.execute_script("arguments[0].click();", submit_button)
         print("✓ Formulario enviado")
         
         # Verificar envío exitoso
         time.sleep(1)
         try:
-            mensaje = driver.find_element(By.ID, "message")
+            mensaje = wait.until(
+                EC.presence_of_element_located((By.ID, "message"))
+            )
             print(f"\n✅ Formulario procesado exitosamente!")
             print(f"   Mensaje: {mensaje.text}")
-        except NoSuchElementException:
+        except (NoSuchElementException, TimeoutException):
             print("⚠️  No se encontró mensaje de confirmación")
             
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         driver.quit()
 
