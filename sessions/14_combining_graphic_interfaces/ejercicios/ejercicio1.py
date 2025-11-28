@@ -6,7 +6,20 @@ Programacion I - Clase 14
 
 EJERCICIO 1 - FILTROS CON MYSQL/SQLite
 
-Crear una aplicacion con filtros de al menos dos variables
+VERSION 1: Filtros basicos por multiples criterios
+
+VERSION 2: Agregada busqueda por texto (LIKE)
+MODIFICACION 1:
+- Nuevo filtro: Buscar estudiantes/productos/empleados por nombre
+- Usa operador LIKE para busqueda parcial
+- Insensible a mayusculas/minusculas
+
+VERSION 3: Agregados graficos estadisticos
+MODIFICACION 2:
+- Nuevas visualizaciones con matplotlib
+- Graficos de barras y pie charts
+- Comparativas visuales de datos
+- Exportacion de graficos a PNG
 
 APLICACION: Sistema de Consulta de Base de Datos Academica
 -----------
@@ -17,6 +30,7 @@ CARACTERISTICAS:
 - Menu interactivo
 - Exportacion de resultados
 - Compatible con MySQL y SQLite
+- NUEVO: Busqueda por texto con LIKE
 """
 
 import sqlite3
@@ -25,6 +39,8 @@ import os
 import sys
 import warnings
 from datetime import datetime
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Intentar importar MySQL
 try:
@@ -35,12 +51,6 @@ except ImportError:
 
 warnings.filterwarnings('ignore')
 
-
-
-
-
-
-
 # ============================================================
 # CONFIGURACION
 # ============================================================
@@ -48,7 +58,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(SCRIPT_DIR)
 
 # Configuracion de base de datos
-DB_TYPE = 'sqlite'  # Cambiar a 'mysql' para usar MySQL
+DB_TYPE = 'sqlite'  # Cambiar a 'mysql' si tienes servidor MySQL
 DB_FILE = 'DB_Propia.db'
 
 # Configuracion MySQL (si se usa)
@@ -58,6 +68,10 @@ MYSQL_CONFIG = {
     'password': 'password',
     'database': 'db_propia'
 }
+
+# VERSION INFO
+VERSION = "3.0 - Graficos estadisticos agregados"
+FECHA_VERSION = "2025-11-28"
 
 # ============================================================
 # FUNCIONES DE UTILIDAD
@@ -106,425 +120,15 @@ def guardar_resultado(datos, nombre_archivo, columnas):
     return False
 
 # ============================================================
-# FUNCIONES DE FILTRADO - ESTUDIANTES
+# MODIFICACION 1: BUSQUEDA POR TEXTO (DE V2)
 # ============================================================
 
-def filtrar_estudiantes_por_edad_y_calificacion(cursor):
-    """Filtro 1: Estudiantes por rango de edad Y calificacion minima"""
+def buscar_por_nombre(cursor):
+    """Buscar registros por nombre usando LIKE"""
     limpiar_pantalla()
-    crear_separador("FILTRO: ESTUDIANTES POR EDAD Y CALIFICACION")
+    crear_separador("BUSQUEDA POR NOMBRE")
     
-    print("\nEste filtro busca estudiantes que cumplan AMBOS criterios:")
-    print("  1. Edad dentro de un rango")
-    print("  2. Calificacion mayor o igual a un minimo\n")
-    
-    # Obtener parametros
-    try:
-        edad_min = int(input("Edad minima (ej: 18): "))
-        edad_max = int(input("Edad maxima (ej: 25): "))
-        calif_min = int(input("Calificacion minima (ej: 85): "))
-    except ValueError:
-        print("\n✗ Error: Ingresa numeros validos")
-        pausar()
-        return
-    
-    # Ejecutar consulta
-    consulta = """
-        SELECT nombre, apellido, edad, calificacion, carrera, ciudad
-        FROM Estudiantes
-        WHERE edad BETWEEN ? AND ?
-        AND calificacion >= ?
-        ORDER BY calificacion DESC, edad ASC
-    """
-    
-    cursor.execute(consulta, (edad_min, edad_max, calif_min))
-    resultados = cursor.fetchall()
-    
-    # Mostrar resultados
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} estudiantes encontrados")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Nombre':<15} {'Apellido':<15} {'Edad':<6} {'Calif':<7} {'Carrera':<25} {'Ciudad':<15}")
-        print("-" * 100)
-        for row in resultados:
-            print(f"{row[0]:<15} {row[1]:<15} {row[2]:<6} {row[3]:<7} {row[4]:<25} {row[5]:<15}")
-        
-        # Guardar resultados
-        if input("\n¿Guardar resultados en CSV? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"estudiantes_edad{edad_min}-{edad_max}_calif{calif_min}_{timestamp}.csv"
-            columnas = ['Nombre', 'Apellido', 'Edad', 'Calificacion', 'Carrera', 'Ciudad']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron estudiantes con esos criterios")
-    
-    pausar()
-
-def filtrar_estudiantes_por_ciudad_y_semestre(cursor):
-    """Filtro 2: Estudiantes por ciudad Y semestre"""
-    limpiar_pantalla()
-    crear_separador("FILTRO: ESTUDIANTES POR CIUDAD Y SEMESTRE")
-    
-    # Mostrar ciudades disponibles
-    cursor.execute("SELECT DISTINCT ciudad FROM Estudiantes ORDER BY ciudad")
-    ciudades = [row[0] for row in cursor.fetchall()]
-    
-    print("\nCiudades disponibles:")
-    for i, ciudad in enumerate(ciudades, 1):
-        print(f"  {i}. {ciudad}")
-    
-    # Obtener parametros
-    try:
-        ciudad_idx = int(input("\nSelecciona ciudad (numero): ")) - 1
-        if ciudad_idx < 0 or ciudad_idx >= len(ciudades):
-            raise ValueError
-        ciudad = ciudades[ciudad_idx]
-        
-        semestre_min = int(input("Semestre minimo (ej: 1): "))
-        semestre_max = int(input("Semestre maximo (ej: 8): "))
-    except (ValueError, IndexError):
-        print("\n✗ Error: Seleccion invalida")
-        pausar()
-        return
-    
-    # Ejecutar consulta
-    consulta = """
-        SELECT nombre, apellido, edad, calificacion, carrera, semestre
-        FROM Estudiantes
-        WHERE ciudad = ?
-        AND semestre BETWEEN ? AND ?
-        ORDER BY semestre ASC, calificacion DESC
-    """
-    
-    cursor.execute(consulta, (ciudad, semestre_min, semestre_max))
-    resultados = cursor.fetchall()
-    
-    # Mostrar resultados
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} estudiantes en {ciudad}, semestres {semestre_min}-{semestre_max}")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Nombre':<15} {'Apellido':<15} {'Edad':<6} {'Calif':<7} {'Carrera':<25} {'Sem':<5}")
-        print("-" * 100)
-        for row in resultados:
-            print(f"{row[0]:<15} {row[1]:<15} {row[2]:<6} {row[3]:<7} {row[4]:<25} {row[5]:<5}")
-        
-        # Estadisticas
-        cursor.execute("""
-            SELECT AVG(calificacion), COUNT(*)
-            FROM Estudiantes
-            WHERE ciudad = ? AND semestre BETWEEN ? AND ?
-        """, (ciudad, semestre_min, semestre_max))
-        promedio, total = cursor.fetchone()
-        print(f"\nEstadisticas:")
-        print(f"  Calificacion promedio: {promedio:.1f}")
-        print(f"  Total de estudiantes: {total}")
-        
-        # Guardar resultados
-        if input("\n¿Guardar resultados en CSV? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"estudiantes_{ciudad}_sem{semestre_min}-{semestre_max}_{timestamp}.csv"
-            columnas = ['Nombre', 'Apellido', 'Edad', 'Calificacion', 'Carrera', 'Semestre']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron estudiantes con esos criterios")
-    
-    pausar()
-
-# ============================================================
-# FUNCIONES DE FILTRADO - PRODUCTOS
-# ============================================================
-
-def filtrar_productos_por_precio_y_stock(cursor):
-    """Filtro 3: Productos por rango de precio Y stock minimo"""
-    limpiar_pantalla()
-    crear_separador("FILTRO: PRODUCTOS POR PRECIO Y STOCK")
-    
-    print("\nEste filtro busca productos que cumplan AMBOS criterios:")
-    print("  1. Precio dentro de un rango")
-    print("  2. Stock mayor o igual a un minimo\n")
-    
-    # Obtener parametros
-    try:
-        precio_min = float(input("Precio minimo (ej: 1000): "))
-        precio_max = float(input("Precio maximo (ej: 10000): "))
-        stock_min = int(input("Stock minimo (ej: 50): "))
-    except ValueError:
-        print("\n✗ Error: Ingresa numeros validos")
-        pausar()
-        return
-    
-    # Ejecutar consulta
-    consulta = """
-        SELECT nombre, categoria, precio, stock, marca, proveedor
-        FROM Productos
-        WHERE precio BETWEEN ? AND ?
-        AND stock >= ?
-        ORDER BY precio ASC, stock DESC
-    """
-    
-    cursor.execute(consulta, (precio_min, precio_max, stock_min))
-    resultados = cursor.fetchall()
-    
-    # Mostrar resultados
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} productos encontrados")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Producto':<20} {'Categoria':<15} {'Precio':<10} {'Stock':<8} {'Marca':<15} {'Proveedor':<20}")
-        print("-" * 100)
-        for row in resultados:
-            print(f"{row[0]:<20} {row[1]:<15} ${row[2]:<9,.0f} {row[3]:<8} {row[4]:<15} {row[5]:<20}")
-        
-        # Estadisticas
-        cursor.execute("""
-            SELECT SUM(precio * stock), AVG(precio), SUM(stock)
-            FROM Productos
-            WHERE precio BETWEEN ? AND ? AND stock >= ?
-        """, (precio_min, precio_max, stock_min))
-        valor_total, precio_prom, stock_total = cursor.fetchone()
-        print(f"\nEstadisticas:")
-        print(f"  Valor total inventario: ${valor_total:,.2f}")
-        print(f"  Precio promedio: ${precio_prom:,.2f}")
-        print(f"  Stock total: {stock_total} unidades")
-        
-        # Guardar resultados
-        if input("\n¿Guardar resultados en CSV? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"productos_precio{int(precio_min)}-{int(precio_max)}_stock{stock_min}_{timestamp}.csv"
-            columnas = ['Producto', 'Categoria', 'Precio', 'Stock', 'Marca', 'Proveedor']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron productos con esos criterios")
-    
-    pausar()
-
-def filtrar_productos_por_categoria_y_marca(cursor):
-    """Filtro 4: Productos por categoria Y marca"""
-    limpiar_pantalla()
-    crear_separador("FILTRO: PRODUCTOS POR CATEGORIA Y MARCA")
-    
-    # Mostrar categorias disponibles
-    cursor.execute("SELECT DISTINCT categoria FROM Productos ORDER BY categoria")
-    categorias = [row[0] for row in cursor.fetchall()]
-    
-    print("\nCategorias disponibles:")
-    for i, cat in enumerate(categorias, 1):
-        print(f"  {i}. {cat}")
-    
-    # Mostrar marcas disponibles
-    cursor.execute("SELECT DISTINCT marca FROM Productos ORDER BY marca")
-    marcas = [row[0] for row in cursor.fetchall()]
-    
-    print("\nMarcas disponibles:")
-    for i, marca in enumerate(marcas, 1):
-        print(f"  {i}. {marca}")
-    
-    # Obtener parametros
-    try:
-        cat_idx = int(input("\nSelecciona categoria (numero): ")) - 1
-        if cat_idx < 0 or cat_idx >= len(categorias):
-            raise ValueError
-        categoria = categorias[cat_idx]
-        
-        marca_idx = int(input("Selecciona marca (numero): ")) - 1
-        if marca_idx < 0 or marca_idx >= len(marcas):
-            raise ValueError
-        marca = marcas[marca_idx]
-    except (ValueError, IndexError):
-        print("\n✗ Error: Seleccion invalida")
-        pausar()
-        return
-    
-    # Ejecutar consulta
-    consulta = """
-        SELECT nombre, precio, stock, proveedor, codigo
-        FROM Productos
-        WHERE categoria = ?
-        AND marca = ?
-        ORDER BY precio DESC
-    """
-    
-    cursor.execute(consulta, (categoria, marca))
-    resultados = cursor.fetchall()
-    
-    # Mostrar resultados
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} productos de {marca} en {categoria}")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Producto':<25} {'Precio':<12} {'Stock':<10} {'Proveedor':<20} {'Codigo':<15}")
-        print("-" * 90)
-        for row in resultados:
-            print(f"{row[0]:<25} ${row[1]:<11,.0f} {row[2]:<10} {row[3]:<20} {row[4]:<15}")
-        
-        # Guardar resultados
-        if input("\n¿Guardar resultados en CSV? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"productos_{categoria}_{marca}_{timestamp}.csv"
-            columnas = ['Producto', 'Precio', 'Stock', 'Proveedor', 'Codigo']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print(f"\n✗ No se encontraron productos de {marca} en {categoria}")
-    
-    pausar()
-
-# ============================================================
-# FUNCIONES DE FILTRADO - EMPLEADOS
-# ============================================================
-
-def filtrar_empleados_por_salario_y_antiguedad(cursor):
-    """Filtro 5: Empleados por rango de salario Y antiguedad minima"""
-    limpiar_pantalla()
-    crear_separador("FILTRO: EMPLEADOS POR SALARIO Y ANTIGUEDAD")
-    
-    print("\nEste filtro busca empleados que cumplan AMBOS criterios:")
-    print("  1. Salario dentro de un rango")
-    print("  2. Antiguedad mayor o igual a un minimo\n")
-    
-    # Obtener parametros
-    try:
-        salario_min = float(input("Salario minimo (ej: 20000): "))
-        salario_max = float(input("Salario maximo (ej: 50000): "))
-        antiguedad_min = int(input("Antiguedad minima en años (ej: 3): "))
-    except ValueError:
-        print("\n✗ Error: Ingresa numeros validos")
-        pausar()
-        return
-    
-    # Ejecutar consulta
-    consulta = """
-        SELECT nombre, apellido, puesto, salario, departamento, antiguedad, email
-        FROM Empleados
-        WHERE salario BETWEEN ? AND ?
-        AND antiguedad >= ?
-        ORDER BY salario DESC, antiguedad DESC
-    """
-    
-    cursor.execute(consulta, (salario_min, salario_max, antiguedad_min))
-    resultados = cursor.fetchall()
-    
-    # Mostrar resultados
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} empleados encontrados")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Nombre':<12} {'Apellido':<12} {'Puesto':<20} {'Salario':<12} {'Depto':<15} {'Años':<6}")
-        print("-" * 90)
-        for row in resultados:
-            print(f"{row[0]:<12} {row[1]:<12} {row[2]:<20} ${row[3]:<11,.0f} {row[4]:<15} {row[5]:<6}")
-        
-        # Estadisticas
-        cursor.execute("""
-            SELECT SUM(salario), AVG(salario), AVG(antiguedad)
-            FROM Empleados
-            WHERE salario BETWEEN ? AND ? AND antiguedad >= ?
-        """, (salario_min, salario_max, antiguedad_min))
-        nomina_total, salario_prom, antiguedad_prom = cursor.fetchone()
-        print(f"\nEstadisticas:")
-        print(f"  Nomina total: ${nomina_total:,.2f}")
-        print(f"  Salario promedio: ${salario_prom:,.2f}")
-        print(f"  Antiguedad promedio: {antiguedad_prom:.1f} años")
-        
-        # Guardar resultados
-        if input("\n¿Guardar resultados en CSV? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"empleados_salario{int(salario_min)}-{int(salario_max)}_antig{antiguedad_min}_{timestamp}.csv"
-            columnas = ['Nombre', 'Apellido', 'Puesto', 'Salario', 'Departamento', 'Antiguedad', 'Email']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron empleados con esos criterios")
-    
-    pausar()
-
-def filtrar_empleados_por_departamento_y_salario(cursor):
-    """Filtro 6: Empleados por departamento Y salario minimo"""
-    limpiar_pantalla()
-    crear_separador("FILTRO: EMPLEADOS POR DEPARTAMENTO Y SALARIO")
-    
-    # Mostrar departamentos disponibles
-    cursor.execute("SELECT DISTINCT departamento FROM Empleados ORDER BY departamento")
-    departamentos = [row[0] for row in cursor.fetchall()]
-    
-    print("\nDepartamentos disponibles:")
-    for i, depto in enumerate(departamentos, 1):
-        print(f"  {i}. {depto}")
-    
-    # Obtener parametros
-    try:
-        depto_idx = int(input("\nSelecciona departamento (numero): ")) - 1
-        if depto_idx < 0 or depto_idx >= len(departamentos):
-            raise ValueError
-        departamento = departamentos[depto_idx]
-        
-        salario_min = float(input("Salario minimo (ej: 25000): "))
-    except (ValueError, IndexError):
-        print("\n✗ Error: Seleccion/valor invalido")
-        pausar()
-        return
-    
-    # Ejecutar consulta
-    consulta = """
-        SELECT nombre, apellido, puesto, salario, antiguedad, email
-        FROM Empleados
-        WHERE departamento = ?
-        AND salario >= ?
-        ORDER BY salario DESC
-    """
-    
-    cursor.execute(consulta, (departamento, salario_min))
-    resultados = cursor.fetchall()
-    
-    # Mostrar resultados
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} empleados en {departamento} con salario >= ${salario_min:,.0f}")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Nombre':<12} {'Apellido':<12} {'Puesto':<25} {'Salario':<12} {'Años':<6} {'Email':<30}")
-        print("-" * 110)
-        for row in resultados:
-            print(f"{row[0]:<12} {row[1]:<12} {row[2]:<25} ${row[3]:<11,.0f} {row[4]:<6} {row[5]:<30}")
-        
-        # Estadisticas del departamento
-        cursor.execute("""
-            SELECT COUNT(*), AVG(salario), SUM(salario)
-            FROM Empleados
-            WHERE departamento = ? AND salario >= ?
-        """, (departamento, salario_min))
-        total, salario_prom, nomina = cursor.fetchone()
-        print(f"\nEstadisticas de {departamento}:")
-        print(f"  Empleados con salario >= ${salario_min:,.0f}: {total}")
-        print(f"  Salario promedio: ${salario_prom:,.2f}")
-        print(f"  Nomina parcial: ${nomina:,.2f}")
-        
-        # Guardar resultados
-        if input("\n¿Guardar resultados en CSV? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"empleados_{departamento}_salario{int(salario_min)}_{timestamp}.csv"
-            columnas = ['Nombre', 'Apellido', 'Puesto', 'Salario', 'Antiguedad', 'Email']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print(f"\n✗ No se encontraron empleados en {departamento} con ese salario")
-    
-    pausar()
-
-# ============================================================
-# FILTRO AVANZADO COMBINADO
-# ============================================================
-
-def filtro_avanzado_multicriterio(cursor):
-    """Filtro 7: Busqueda avanzada con multiples criterios opcionales"""
-    limpiar_pantalla()
-    crear_separador("FILTRO AVANZADO: BUSQUEDA MULTICRITERIO")
-    
-    print("\nSelecciona la tabla a consultar:")
+    print("\nSelecciona la tabla a buscar:")
     print("  1. Estudiantes")
     print("  2. Productos")
     print("  3. Empleados")
@@ -536,224 +140,329 @@ def filtro_avanzado_multicriterio(cursor):
         pausar()
         return
     
+    termino = input("\nIngresa el termino a buscar: ").strip()
+    if not termino:
+        print("\n✗ Debes ingresar un termino")
+        pausar()
+        return
+    
+    patron = f"%{termino}%"
+    
     if opcion == 1:
-        filtro_estudiantes_avanzado(cursor)
+        cursor.execute("""
+            SELECT nombre, apellido, edad, calificacion, carrera, ciudad
+            FROM Estudiantes
+            WHERE LOWER(nombre) LIKE LOWER(?) OR LOWER(apellido) LIKE LOWER(?)
+        """, (patron, patron))
+        resultados = cursor.fetchall()
+        print(f"\n{len(resultados)} estudiantes encontrados")
+        for row in resultados:
+            print(f"  {row[0]} {row[1]} - {row[4]} - {row[5]}")
     elif opcion == 2:
-        filtro_productos_avanzado(cursor)
+        cursor.execute("""
+            SELECT nombre, categoria, precio, stock
+            FROM Productos
+            WHERE LOWER(nombre) LIKE LOWER(?)
+        """, (patron,))
+        resultados = cursor.fetchall()
+        print(f"\n{len(resultados)} productos encontrados")
+        for row in resultados:
+            print(f"  {row[0]} - ${row[2]:,.0f}")
     elif opcion == 3:
-        filtro_empleados_avanzado(cursor)
+        cursor.execute("""
+            SELECT nombre, apellido, puesto, departamento
+            FROM Empleados
+            WHERE LOWER(nombre) LIKE LOWER(?) OR LOWER(apellido) LIKE LOWER(?)
+        """, (patron, patron))
+        resultados = cursor.fetchall()
+        print(f"\n{len(resultados)} empleados encontrados")
+        for row in resultados:
+            print(f"  {row[0]} {row[1]} - {row[2]} - {row[3]}")
+    
+    pausar()
+
+# ============================================================
+# MODIFICACION 2: NUEVAS FUNCIONES - GRAFICOS ESTADISTICOS
+# ============================================================
+
+def generar_graficos(cursor):
+    """NUEVO: Menu de graficos estadisticos"""
+    limpiar_pantalla()
+    crear_separador("GRAFICOS ESTADISTICOS (NUEVO EN V3)")
+    
+    print("\nSelecciona el tipo de grafico:")
+    print("  1. Estudiantes por ciudad (Barras)")
+    print("  2. Distribucion de calificaciones (Histograma)")
+    print("  3. Productos por categoria (Pie Chart)")
+    print("  4. Salarios por departamento (Barras)")
+    print("  5. Comparativa general (Multiple)")
+    
+    try:
+        opcion = int(input("\nOpcion: "))
+    except ValueError:
+        print("\n✗ Error: Opcion invalida")
+        pausar()
+        return
+    
+    if opcion == 1:
+        grafico_estudiantes_por_ciudad(cursor)
+    elif opcion == 2:
+        grafico_distribucion_calificaciones(cursor)
+    elif opcion == 3:
+        grafico_productos_por_categoria(cursor)
+    elif opcion == 4:
+        grafico_salarios_por_departamento(cursor)
+    elif opcion == 5:
+        grafico_comparativa_general(cursor)
     else:
         print("\n✗ Opcion invalida")
         pausar()
 
-def filtro_estudiantes_avanzado(cursor):
-    """Filtro avanzado de estudiantes con 3+ criterios"""
-    print("\n--- FILTRO AVANZADO DE ESTUDIANTES ---")
-    print("Ingresa los criterios (deja en blanco para omitir):\n")
+def grafico_estudiantes_por_ciudad(cursor):
+    """Grafico de barras: Estudiantes por ciudad"""
+    print("\n[Generando grafico de estudiantes por ciudad...]")
     
-    # Recopilar criterios
-    ciudad = input("Ciudad: ").strip()
-    edad_min = input("Edad minima: ").strip()
-    edad_max = input("Edad maxima: ").strip()
-    calif_min = input("Calificacion minima: ").strip()
-    semestre_min = input("Semestre minimo: ").strip()
-    semestre_max = input("Semestre maximo: ").strip()
+    cursor.execute("""
+        SELECT ciudad, COUNT(*) as total
+        FROM Estudiantes
+        GROUP BY ciudad
+        ORDER BY total DESC
+    """)
+    datos = cursor.fetchall()
     
-    # Construir consulta dinamica
-    consulta = "SELECT nombre, apellido, edad, calificacion, carrera, semestre, ciudad FROM Estudiantes WHERE 1=1"
-    parametros = []
+    if not datos:
+        print("✗ No hay datos para graficar")
+        pausar()
+        return
     
-    if ciudad:
-        consulta += " AND ciudad = ?"
-        parametros.append(ciudad)
-    if edad_min:
-        consulta += " AND edad >= ?"
-        parametros.append(int(edad_min))
-    if edad_max:
-        consulta += " AND edad <= ?"
-        parametros.append(int(edad_max))
-    if calif_min:
-        consulta += " AND calificacion >= ?"
-        parametros.append(int(calif_min))
-    if semestre_min:
-        consulta += " AND semestre >= ?"
-        parametros.append(int(semestre_min))
-    if semestre_max:
-        consulta += " AND semestre <= ?"
-        parametros.append(int(semestre_max))
+    ciudades = [row[0] for row in datos]
+    totales = [row[1] for row in datos]
     
-    consulta += " ORDER BY calificacion DESC"
+    plt.figure(figsize=(10, 6))
+    colores = plt.cm.viridis(np.linspace(0.2, 0.9, len(ciudades)))
+    barras = plt.bar(ciudades, totales, color=colores, edgecolor='black', linewidth=1.2)
     
-    # Ejecutar
-    cursor.execute(consulta, tuple(parametros))
-    resultados = cursor.fetchall()
+    plt.xlabel('Ciudad', fontsize=12, fontweight='bold')
+    plt.ylabel('Numero de Estudiantes', fontsize=12, fontweight='bold')
+    plt.title('Estudiantes por Ciudad', fontsize=14, fontweight='bold', pad=15)
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(axis='y', alpha=0.3, linestyle='--')
     
-    # Mostrar
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} estudiantes encontrados")
-    print(f"{'='*80}")
+    # Valores sobre barras
+    for barra in barras:
+        altura = barra.get_height()
+        plt.text(barra.get_x() + barra.get_width()/2., altura,
+                f'{int(altura)}', ha='center', va='bottom', fontweight='bold')
     
-    if resultados:
-        print(f"\n{'Nombre':<12} {'Apellido':<12} {'Edad':<6} {'Calif':<7} {'Carrera':<20} {'Sem':<5} {'Ciudad':<12}")
-        print("-" * 90)
-        for row in resultados:
-            print(f"{row[0]:<12} {row[1]:<12} {row[2]:<6} {row[3]:<7} {row[4]:<20} {row[5]:<5} {row[6]:<12}")
-        
-        if input("\n¿Guardar resultados? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"estudiantes_avanzado_{timestamp}.csv"
-            columnas = ['Nombre', 'Apellido', 'Edad', 'Calificacion', 'Carrera', 'Semestre', 'Ciudad']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron estudiantes")
-    
+    plt.tight_layout()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archivo = f"grafico_estudiantes_ciudad_{timestamp}.png"
+    plt.savefig(archivo, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Grafico guardado: {archivo}")
+    plt.show()
     pausar()
 
-def filtro_productos_avanzado(cursor):
-    """Filtro avanzado de productos con 3+ criterios"""
-    print("\n--- FILTRO AVANZADO DE PRODUCTOS ---")
-    print("Ingresa los criterios (deja en blanco para omitir):\n")
+def grafico_distribucion_calificaciones(cursor):
+    """Histograma: Distribucion de calificaciones"""
+    print("\n[Generando histograma de calificaciones...]")
     
-    categoria = input("Categoria: ").strip()
-    marca = input("Marca: ").strip()
-    precio_min = input("Precio minimo: ").strip()
-    precio_max = input("Precio maximo: ").strip()
-    stock_min = input("Stock minimo: ").strip()
+    cursor.execute("SELECT calificacion FROM Estudiantes")
+    calificaciones = [row[0] for row in cursor.fetchall()]
     
-    # Construir consulta
-    consulta = "SELECT nombre, categoria, marca, precio, stock, proveedor FROM Productos WHERE 1=1"
-    parametros = []
+    if not calificaciones:
+        print("✗ No hay datos para graficar")
+        pausar()
+        return
     
-    if categoria:
-        consulta += " AND categoria = ?"
-        parametros.append(categoria)
-    if marca:
-        consulta += " AND marca = ?"
-        parametros.append(marca)
-    if precio_min:
-        consulta += " AND precio >= ?"
-        parametros.append(float(precio_min))
-    if precio_max:
-        consulta += " AND precio <= ?"
-        parametros.append(float(precio_max))
-    if stock_min:
-        consulta += " AND stock >= ?"
-        parametros.append(int(stock_min))
+    plt.figure(figsize=(10, 6))
+    n, bins, patches = plt.hist(calificaciones, bins=8, color='#3498db', 
+                                edgecolor='black', alpha=0.75, linewidth=1.2)
     
-    consulta += " ORDER BY precio DESC"
+    plt.xlabel('Calificacion', fontsize=12, fontweight='bold')
+    plt.ylabel('Frecuencia', fontsize=12, fontweight='bold')
+    plt.title('Distribucion de Calificaciones', fontsize=14, fontweight='bold', pad=15)
+    plt.grid(axis='y', alpha=0.3, linestyle='--')
     
-    cursor.execute(consulta, tuple(parametros))
-    resultados = cursor.fetchall()
+    # Linea de promedio
+    promedio = np.mean(calificaciones)
+    plt.axvline(promedio, color='red', linestyle='--', linewidth=2.5,
+               label=f'Promedio: {promedio:.1f}')
+    plt.legend()
     
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} productos encontrados")
-    print(f"{'='*80}")
-    
-    if resultados:
-        print(f"\n{'Producto':<20} {'Categoria':<15} {'Marca':<15} {'Precio':<12} {'Stock':<8}")
-        print("-" * 80)
-        for row in resultados:
-            print(f"{row[0]:<20} {row[1]:<15} {row[2]:<15} ${row[3]:<11,.0f} {row[4]:<8}")
-        
-        if input("\n¿Guardar resultados? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"productos_avanzado_{timestamp}.csv"
-            columnas = ['Producto', 'Categoria', 'Marca', 'Precio', 'Stock', 'Proveedor']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron productos")
-    
+    plt.tight_layout()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archivo = f"grafico_calificaciones_{timestamp}.png"
+    plt.savefig(archivo, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Grafico guardado: {archivo}")
+    plt.show()
     pausar()
 
-def filtro_empleados_avanzado(cursor):
-    """Filtro avanzado de empleados con 3+ criterios"""
-    print("\n--- FILTRO AVANZADO DE EMPLEADOS ---")
-    print("Ingresa los criterios (deja en blanco para omitir):\n")
+def grafico_productos_por_categoria(cursor):
+    """Pie chart: Productos por categoria"""
+    print("\n[Generando pie chart de productos...]")
     
-    departamento = input("Departamento: ").strip()
-    salario_min = input("Salario minimo: ").strip()
-    salario_max = input("Salario maximo: ").strip()
-    antiguedad_min = input("Antiguedad minima (años): ").strip()
+    cursor.execute("""
+        SELECT categoria, COUNT(*) as total
+        FROM Productos
+        GROUP BY categoria
+    """)
+    datos = cursor.fetchall()
     
-    # Construir consulta
-    consulta = "SELECT nombre, apellido, puesto, salario, departamento, antiguedad FROM Empleados WHERE 1=1"
-    parametros = []
+    if not datos:
+        print("✗ No hay datos para graficar")
+        pausar()
+        return
     
-    if departamento:
-        consulta += " AND departamento = ?"
-        parametros.append(departamento)
-    if salario_min:
-        consulta += " AND salario >= ?"
-        parametros.append(float(salario_min))
-    if salario_max:
-        consulta += " AND salario <= ?"
-        parametros.append(float(salario_max))
-    if antiguedad_min:
-        consulta += " AND antiguedad >= ?"
-        parametros.append(int(antiguedad_min))
+    categorias = [row[0] for row in datos]
+    totales = [row[1] for row in datos]
     
-    consulta += " ORDER BY salario DESC"
+    plt.figure(figsize=(10, 8))
+    colores = plt.cm.Set3(np.linspace(0, 1, len(categorias)))
+    explode = [0.05] * len(categorias)
     
-    cursor.execute(consulta, tuple(parametros))
-    resultados = cursor.fetchall()
+    plt.pie(totales, labels=categorias, autopct='%1.1f%%',
+           startangle=90, colors=colores, explode=explode,
+           shadow=True, textprops={'fontsize': 11, 'fontweight': 'bold'})
     
-    print(f"\n{'='*80}")
-    print(f"RESULTADOS: {len(resultados)} empleados encontrados")
-    print(f"{'='*80}")
+    plt.title('Distribucion de Productos por Categoria', 
+             fontsize=14, fontweight='bold', pad=20)
     
-    if resultados:
-        print(f"\n{'Nombre':<12} {'Apellido':<12} {'Puesto':<20} {'Salario':<12} {'Depto':<15} {'Años':<6}")
-        print("-" * 90)
-        for row in resultados:
-            print(f"{row[0]:<12} {row[1]:<12} {row[2]:<20} ${row[3]:<11,.0f} {row[4]:<15} {row[5]:<6}")
-        
-        if input("\n¿Guardar resultados? (s/n): ").lower() == 's':
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"empleados_avanzado_{timestamp}.csv"
-            columnas = ['Nombre', 'Apellido', 'Puesto', 'Salario', 'Departamento', 'Antiguedad']
-            guardar_resultado(resultados, archivo, columnas)
-    else:
-        print("\n✗ No se encontraron empleados")
+    plt.tight_layout()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archivo = f"grafico_productos_categoria_{timestamp}.png"
+    plt.savefig(archivo, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Grafico guardado: {archivo}")
+    plt.show()
+    pausar()
+
+def grafico_salarios_por_departamento(cursor):
+    """Grafico de barras: Salario promedio por departamento"""
+    print("\n[Generando grafico de salarios...]")
     
+    cursor.execute("""
+        SELECT departamento, AVG(salario) as promedio
+        FROM Empleados
+        GROUP BY departamento
+        ORDER BY promedio DESC
+    """)
+    datos = cursor.fetchall()
+    
+    if not datos:
+        print("✗ No hay datos para graficar")
+        pausar()
+        return
+    
+    departamentos = [row[0] for row in datos]
+    salarios = [row[1] for row in datos]
+    
+    plt.figure(figsize=(12, 6))
+    colores = plt.cm.plasma(np.linspace(0.2, 0.9, len(departamentos)))
+    barras = plt.barh(departamentos, salarios, color=colores, 
+                     edgecolor='black', linewidth=1.2)
+    
+    plt.xlabel('Salario Promedio ($)', fontsize=12, fontweight='bold')
+    plt.ylabel('Departamento', fontsize=12, fontweight='bold')
+    plt.title('Salario Promedio por Departamento', fontsize=14, fontweight='bold', pad=15)
+    plt.grid(axis='x', alpha=0.3, linestyle='--')
+    
+    # Valores en las barras
+    for i, barra in enumerate(barras):
+        ancho = barra.get_width()
+        plt.text(ancho, barra.get_y() + barra.get_height()/2.,
+                f'${ancho:,.0f}', ha='left', va='center', fontweight='bold')
+    
+    plt.tight_layout()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archivo = f"grafico_salarios_departamento_{timestamp}.png"
+    plt.savefig(archivo, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Grafico guardado: {archivo}")
+    plt.show()
+    pausar()
+
+def grafico_comparativa_general(cursor):
+    """Grafico multiple: Comparativa general"""
+    print("\n[Generando grafico comparativo...]")
+    
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # Grafico 1: Estudiantes por ciudad
+    cursor.execute("SELECT ciudad, COUNT(*) FROM Estudiantes GROUP BY ciudad")
+    datos = cursor.fetchall()
+    ciudades = [row[0] for row in datos]
+    totales = [row[1] for row in datos]
+    ax1.bar(ciudades, totales, color='#3498db', edgecolor='black')
+    ax1.set_title('Estudiantes por Ciudad', fontweight='bold')
+    ax1.set_ylabel('Cantidad')
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Grafico 2: Calificaciones
+    cursor.execute("SELECT calificacion FROM Estudiantes")
+    califs = [row[0] for row in cursor.fetchall()]
+    ax2.hist(califs, bins=8, color='#2ecc71', edgecolor='black', alpha=0.7)
+    ax2.set_title('Distribucion de Calificaciones', fontweight='bold')
+    ax2.set_xlabel('Calificacion')
+    ax2.set_ylabel('Frecuencia')
+    
+    # Grafico 3: Productos por categoria
+    cursor.execute("SELECT categoria, COUNT(*) FROM Productos GROUP BY categoria")
+    datos = cursor.fetchall()
+    categorias = [row[0] for row in datos]
+    totales = [row[1] for row in datos]
+    ax3.pie(totales, labels=categorias, autopct='%1.1f%%', startangle=90)
+    ax3.set_title('Productos por Categoria', fontweight='bold')
+    
+    # Grafico 4: Salarios
+    cursor.execute("SELECT departamento, AVG(salario) FROM Empleados GROUP BY departamento")
+    datos = cursor.fetchall()
+    deptos = [row[0] for row in datos]
+    salarios = [row[1] for row in datos]
+    ax4.barh(deptos, salarios, color='#e74c3c', edgecolor='black')
+    ax4.set_title('Salario Promedio por Depto', fontweight='bold')
+    ax4.set_xlabel('Salario ($)')
+    
+    plt.suptitle('Dashboard Estadistico General', fontsize=16, fontweight='bold', y=0.995)
+    plt.tight_layout()
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archivo = f"grafico_dashboard_{timestamp}.png"
+    plt.savefig(archivo, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Grafico guardado: {archivo}")
+    plt.show()
     pausar()
 
 # ============================================================
-# MENU PRINCIPAL
+# MENU PRINCIPAL (MODIFICADO)
 # ============================================================
 
 def mostrar_menu():
-    """Muestra el menu principal"""
+    """Muestra el menu principal - ACTUALIZADO V3"""
     limpiar_pantalla()
     crear_separador("SISTEMA DE FILTROS - BASE DE DATOS ACADEMICA")
     
+    print(f"\nVERSION: {VERSION}")
+    print(f"Fecha: {FECHA_VERSION}")
+    
     print("""
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                        FILTROS DISPONIBLES                                ║
+║                        MENU PRINCIPAL                                     ║
 ╠═══════════════════════════════════════════════════════════════════════════╣
 ║                                                                           ║
-║  ESTUDIANTES:                                                             ║
-║    1. Filtrar por EDAD y CALIFICACION                                     ║
-║    2. Filtrar por CIUDAD y SEMESTRE                                       ║
+║  🔍 BUSQUEDA:                                                             ║
+║    1. Buscar por nombre (V2)                                              ║
 ║                                                                           ║
-║  PRODUCTOS:                                                               ║
-║    3. Filtrar por PRECIO y STOCK                                          ║
-║    4. Filtrar por CATEGORIA y MARCA                                       ║
+║  📊 GRAFICOS: ⭐ NUEVA FUNCIONALIDAD V3                                   ║
+║    2. Generar graficos estadisticos                                       ║
 ║                                                                           ║
-║  EMPLEADOS:                                                               ║
-║    5. Filtrar por SALARIO y ANTIGUEDAD                                    ║
-║    6. Filtrar por DEPARTAMENTO y SALARIO                                  ║
+║  📈 ESTADISTICAS:                                                         ║
+║    3. Ver estadisticas generales                                          ║
 ║                                                                           ║
-║  AVANZADO:                                                                ║
-║    7. Busqueda multicriterio (3+ variables)                               ║
-║                                                                           ║
-║    8. Ver estadisticas generales                                          ║
-║    9. Salir                                                               ║
+║    4. Salir                                                               ║
 ║                                                                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
     """)
 
 def ver_estadisticas(cursor):
-    """Muestra estadisticas generales de la base de datos"""
+    """Muestra estadisticas generales"""
     limpiar_pantalla()
     crear_separador("ESTADISTICAS GENERALES")
     
@@ -765,19 +474,17 @@ def ver_estadisticas(cursor):
     print(f"  Calificacion promedio: {calif_prom:.1f}")
     
     print("\nPRODUCTOS:")
-    cursor.execute("SELECT COUNT(*), SUM(stock), AVG(precio), SUM(precio * stock) FROM Productos")
-    total_prod, stock_total, precio_prom, valor_inv = cursor.fetchone()
+    cursor.execute("SELECT COUNT(*), SUM(stock), AVG(precio) FROM Productos")
+    total_prod, stock_total, precio_prom = cursor.fetchone()
     print(f"  Total: {total_prod}")
     print(f"  Stock total: {stock_total} unidades")
     print(f"  Precio promedio: ${precio_prom:,.2f}")
-    print(f"  Valor inventario: ${valor_inv:,.2f}")
     
     print("\nEMPLEADOS:")
-    cursor.execute("SELECT COUNT(*), AVG(salario), AVG(antiguedad), SUM(salario) FROM Empleados")
-    total_emp, salario_prom, antig_prom, nomina = cursor.fetchone()
+    cursor.execute("SELECT COUNT(*), AVG(salario), SUM(salario) FROM Empleados")
+    total_emp, salario_prom, nomina = cursor.fetchone()
     print(f"  Total: {total_emp}")
     print(f"  Salario promedio: ${salario_prom:,.2f}")
-    print(f"  Antiguedad promedio: {antig_prom:.1f} años")
     print(f"  Nomina total: ${nomina:,.2f}")
     
     pausar()
@@ -785,13 +492,12 @@ def ver_estadisticas(cursor):
 def main():
     """Funcion principal"""
     print("="*80)
-    print("SISTEMA DE FILTROS - CLASE 13")
+    print("SISTEMA DE FILTROS - CLASE 13 - VERSION 3")
     print("Carlos Pulido Rosas - MCD - CUCEA")
     print("="*80)
-    print(f"\nDirectorio: {SCRIPT_DIR}")
+    print(f"\nVersion: {VERSION}")
+    print(f"Directorio: {SCRIPT_DIR}")
     print(f"Base de datos: {DB_TYPE.upper()}")
-    if DB_TYPE == 'mysql':
-        print(f"MySQL disponible: {'SI' if MYSQL_DISPONIBLE else 'NO (usando SQLite)'}")
     print()
     
     # Conectar a la base de datos
@@ -809,22 +515,12 @@ def main():
             continue
         
         if opcion == 1:
-            filtrar_estudiantes_por_edad_y_calificacion(cursor)
+            buscar_por_nombre(cursor)
         elif opcion == 2:
-            filtrar_estudiantes_por_ciudad_y_semestre(cursor)
+            generar_graficos(cursor)  # NUEVA FUNCION V3
         elif opcion == 3:
-            filtrar_productos_por_precio_y_stock(cursor)
-        elif opcion == 4:
-            filtrar_productos_por_categoria_y_marca(cursor)
-        elif opcion == 5:
-            filtrar_empleados_por_salario_y_antiguedad(cursor)
-        elif opcion == 6:
-            filtrar_empleados_por_departamento_y_salario(cursor)
-        elif opcion == 7:
-            filtro_avanzado_multicriterio(cursor)
-        elif opcion == 8:
             ver_estadisticas(cursor)
-        elif opcion == 9:
+        elif opcion == 4:
             print("\n¡Hasta luego!")
             break
         else:
